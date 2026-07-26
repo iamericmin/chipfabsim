@@ -21,15 +21,15 @@ impl Tech {
 }
 
 pub struct TickRates {
-  pub fab_tick: i16,
-  pub sell_tick: i8,
+  pub fab_tick: u64,
+  pub sell_tick: u64,
 }
 
 impl TickRates {
   pub fn new() -> Self {
     Self {
       fab_tick: 1000,
-      sell_tick: 10,
+      sell_tick: 1000,
     }
   }
 }
@@ -39,6 +39,7 @@ pub struct Stats {
   pub chip_price: f32, // chip_price = chip_performance / chip_yield;
   pub chip_yield: f32,
   pub chip_performance: f32,
+  pub chip_demand: u64,
   pub chip_price_multiplier: f32,
   pub silicon_cost: f32,
   pub silicon_cost_multiplier: f32,
@@ -52,6 +53,7 @@ impl Stats {
       chip_price: 1.0,
       chip_yield: 0.5,
       chip_performance: 1.0,
+      chip_demand: 100,
       chip_price_multiplier: 1.5,
       silicon_cost: 10.0,
       silicon_cost_multiplier: 1.0,

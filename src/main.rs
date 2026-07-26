@@ -8,6 +8,7 @@ use ratatui::Terminal;
 use game_data::{GameData, game_data_init};
 
 use crate::Action::{BuySilicon, MakeChip, BuyFab, QuitGame, Undefined};
+use crate::Window::{Tech, Stats, Upgrades, Stocks};
 
 pub enum Action {
   MakeChip,
@@ -15,6 +16,14 @@ pub enum Action {
   BuyFab,
   QuitGame,
   Undefined
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum Window {
+    Tech,
+    Stats,
+    Upgrades,
+    Stocks,
 }
 
 // process nodes
@@ -33,10 +42,6 @@ fn key_to_action(c: KeyCode) -> Action {
         KeyCode::Char('q') => QuitGame,
         _ => Undefined
     }
-}
-
-fn shop(d: &GameData) {
-
 }
 
 fn check_available_purchases(d: &mut GameData) {
@@ -76,6 +81,49 @@ fn take_action(a: &Action, d: &mut GameData) -> bool {
     false
 }
 
+fn change_window(c: KeyCode, w: &Window) -> &Window {
+    match c {
+        KeyCode::Char('w') => {
+            if *w == Window::Upgrades {
+                &Tech
+            } else if *w == Window::Stocks {
+                &Stats
+            } else {
+                w
+            }
+        }
+        KeyCode::Char('a') => {
+            if *w == Window::Stats {
+                &Tech
+            } else if *w == Window::Stocks {
+                &Upgrades
+            } else {
+                w
+            }
+        }
+        KeyCode::Char('s') => {
+            if *w == Window::Tech {
+                &Upgrades
+            } else if *w == Window::Stats {
+                &Stocks
+            } else {
+                w
+            }
+        }
+        KeyCode::Char('d') => {
+            if *w == Window::Tech {
+                &Stats
+            } else if *w == Window::Upgrades {
+                &Stocks
+            } else {
+                w
+            }
+        }
+        _ => w
+        
+    }
+}
+
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
     
@@ -90,14 +138,17 @@ fn main() -> io::Result<()> {
     let mut last_fab_tick = Instant::now();
     let mut last_sell_tick = Instant::now();
 
+    let mut focused_window: &Window = &Tech;
+
     loop {
-        graphics::render_console(&mut terminal, &data);
+        _ = graphics::render_console(&mut terminal, &data, focused_window);
 
         // 1. Check for User Input (Quick non-blocking 20ms check)
         if event::poll(Duration::from_millis(20)).unwrap() {
             if let Event::Key(key_event) = event::read().unwrap() {
                 if key_event.kind == KeyEventKind::Press {
                     let action = key_to_action(key_event.code);
+                    focused_window = change_window(key_event.code, &mut focused_window);
                     
                     if let Action::QuitGame = action {
                         break; 
@@ -110,7 +161,7 @@ fn main() -> io::Result<()> {
         }
         
         // sell clock
-        if last_sell_tick.elapsed() >= Duration::from_millis(data.ticks.sell_tick as u64) {
+        if last_sell_tick.elapsed() >= Duration::from_millis((data.ticks.sell_tick / data.stats.chip_demand) as u64) {
             last_sell_tick = Instant::now(); // Reset the timer clock
             if data.tech.chips >= 1 {
                 data.tech.chips -= 1;
