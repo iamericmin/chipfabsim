@@ -8,30 +8,9 @@ pub struct Tech {
   pub fabs: u32, //  determines yield and die count
 }
 
-impl Tech {
-  pub fn new() -> Self {
-    Self {
-      chips: 1000,
-      silicon: 500,
-      money: 1000.0,
-      engineers: 10,
-      fabs: 0,
-    }
-  }
-}
-
 pub struct TickRates {
   pub fab_tick: u64,
   pub sell_tick: u64,
-}
-
-impl TickRates {
-  pub fn new() -> Self {
-    Self {
-      fab_tick: 1000,
-      sell_tick: 1000,
-    }
-  }
 }
 
 pub struct Stats {
@@ -44,6 +23,22 @@ pub struct Stats {
   pub silicon_cost: f32,
   pub silicon_cost_multiplier: f32,
   pub wafer_die_count: u16,
+}
+
+pub struct Upgrades {
+  pub fuck: u8,
+}
+
+impl Tech {
+  pub fn new() -> Self {
+    Self {
+      chips: 0,
+      silicon: 50,
+      money: 0.0,
+      engineers: 10,
+      fabs: 0,
+    }
+  }
 }
 
 impl Stats {
@@ -62,8 +57,13 @@ impl Stats {
   }
 }
 
-pub struct Upgrades {
-  pub fuck: u8,
+impl TickRates {
+  pub fn new() -> Self {
+    Self {
+      fab_tick: 1000,
+      sell_tick: 10000,
+    }
+  }
 }
 
 impl Upgrades {

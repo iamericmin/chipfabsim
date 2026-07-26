@@ -124,6 +124,10 @@ fn change_window(c: KeyCode, w: &Window) -> &Window {
     }
 }
 
+fn push_message(s: &str) {
+    
+}
+
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
     
@@ -170,11 +174,6 @@ fn main() -> io::Result<()> {
                 // graphics::print_coord("Out of stock!", MESSAGES_ROW, 0);
                 // graphics::flush();
             }
-        }
-
-        // manufacturing clock
-        if last_fab_tick.elapsed() >= Duration::from_millis(data.ticks.fab_tick as u64) {
-            last_fab_tick = Instant::now(); // Reset the timer clock
             if data.tech.fabs >= 1 && data.tech.silicon >= data.tech.fabs as u64 {
                 data.tech.chips += data.tech.fabs as u64 * (data.stats.wafer_die_count as f32 * data.stats.chip_yield).floor() as u64;
                 data.tech.silicon -= data.tech.fabs as u64;
@@ -183,6 +182,11 @@ fn main() -> io::Result<()> {
                 // graphics::flush();
             }
         }
+
+        // manufacturing clock
+        // if last_fab_tick.elapsed() >= Duration::from_millis(data.ticks.fab_tick as u64) {
+        //     last_fab_tick = Instant::now(); // Reset the timer clock
+        // }
     }
 
     disable_raw_mode().unwrap();
