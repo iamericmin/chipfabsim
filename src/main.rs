@@ -1,148 +1,142 @@
-use std::mem::take;
-use std::time::Duration;
+use std::io::{self, stdout};
+use std::time::{Duration, Instant};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::ExecutableCommand;
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
+use game_data::{GameData, game_data_init};
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crate::Action::{BuySilicon, MakeChip, BuyFab, QuitGame, Undefined};
+
+pub enum Action {
+  MakeChip,
+  BuySilicon,
+  BuyFab,
+  QuitGame,
+  Undefined
+}
+
+// process nodes
+pub enum Nodes {
+    
+}
 
 mod graphics;
-
-use crate::Action::{BuySilicon, MakeChip, SellChip, QuitGame, Undefined};
-
-const STATS_ROW: u8 = 1;
-const PROMPT_ROW: u8 = 20;
-const MESSAGES_ROW: u8 = 25;
-const HELP_ROW: u8 = 30;
-
-struct GameData {
-    chips: u64,
-    silicon: u64,
-    chip_cost: f32,
-    silicon_cost: f32,
-    chip_price_multiplier: f32,
-    silicon_price_multiplier: f32,
-    money: f32,
-    engineers: u64,
-    fabs: i32,
-}
-
-enum Action {
-    SellChip,
-    MakeChip,
-    BuySilicon,
-    QuitGame,
-    Undefined
-}
+mod game_data;
 
 fn key_to_action(c: KeyCode) -> Action {
     match c {
-        KeyCode::Char('s') => SellChip,
         KeyCode::Char('m') => MakeChip,
         KeyCode::Char('b') => BuySilicon,
+        KeyCode::Char('p') => BuyFab,
         KeyCode::Char('q') => QuitGame,
         _ => Undefined
     }
 }
 
-fn display_status(d: &GameData) {
-    graphics::print_coord(&format!("Chips:     {}", d.chips), STATS_ROW, 0);
-    graphics::print_coord(&format!("Silicon:   {}", d.silicon), STATS_ROW + 1, 0);
-    graphics::print_coord(&format!("Money:     {}", d.money), STATS_ROW + 2, 0);
-    graphics::print_coord(&format!("Engineers: {}", d.engineers), STATS_ROW + 3, 0);
-    graphics::print_coord(&format!("Fabs:      {}", d.fabs), STATS_ROW + 4, 0);
-    graphics::print_coord("Press: [s] Sell, [m] Make, [b] Buy Silicon, [q] Quit\r\n>_ ", PROMPT_ROW, 0);
+fn shop(d: &GameData) {
+
 }
 
-fn check_available_purchases(d: &GameData) {
-    if d.money >= 300.0 {
-        graphics::print_coord("Nano Fab available for purchase!\r\n",MESSAGES_ROW,0);
+fn check_available_purchases(d: &mut GameData) {
+    if d.tech.money >= 300.0 {
+        // graphics::print_coord("Nano Fab available for purchase!\r\n",MESSAGES_ROW,0);
     }
 }
 
 fn take_action(a: &Action, d: &mut GameData) -> bool {
     match a {
-        Action::SellChip => {
-            if d.chips >= 1 {
-                d.chips -= 1;
-                d.money += d.chip_cost;
-            } else {
-                graphics::print_coord("Out of stock!", MESSAGES_ROW, 0);
-            }
-        }
         Action::MakeChip => {
-            if d.silicon >= 1 {
-                d.chips += 5;
-                d.silicon -= 1;
+            if d.tech.silicon >= 1 {
+                d.tech.chips += (d.stats.wafer_die_count as f32 * d.stats.chip_yield).floor() as u64;
+                d.tech.silicon -= 1;
             } else {
-                graphics::print_coord("Out of silicon!", MESSAGES_ROW, 0);
+                // graphics::print_coord("Out of silicon!", MESSAGES_ROW, 0);
             }
         }
         Action::BuySilicon => {
-            if d.money >= d.silicon_cost {
-                d.silicon += 5;
-                d.money -= d.silicon_cost;
+            if d.tech.money >= d.stats.silicon_cost {
+                d.tech.silicon += 5;
+                d.tech.money -= d.stats.silicon_cost;
             } else {
-                graphics::print_coord("Out of money!", MESSAGES_ROW, 0);
+                // graphics::print_coord("Out of money!", MESSAGES_ROW, 0);
             }
+        }
+        Action::BuyFab => {
+            d.tech.fabs += 1;
         }
         Action::QuitGame => {
             return true;
         }
         Action::Undefined => {
-                graphics::print_coord("Error!", MESSAGES_ROW, 0);
+                // graphics::print_coord("Error!", MESSAGES_ROW, 0);
         }
     }
     false
 }
 
-fn game_loop(a: &Action, d: &mut GameData) -> bool {
-    graphics::clear_screen();
-    if take_action(a, d) {
-        return true;
-    }
-    display_status(d);
-    check_available_purchases(d);
-    graphics::flush();
-    false
-}
-fn main() {
+fn main() -> io::Result<()> {
+    enable_raw_mode()?;
+    
+    stdout().execute(EnterAlternateScreen)?; // Switches to a clean full-screen canvas
+    
+    let backend = CrosstermBackend::new(stdout());
+    let mut terminal = Terminal::new(backend)?;
+    
+    let mut data: GameData = game_data_init();
 
-    graphics::clear_screen();
-
-    let mut data = GameData {
-        chips: 50,
-        silicon: 50,
-        money: 100.0,
-        silicon_cost: 1.0,
-        silicon_price_multiplier: 1.0,
-        chip_cost: 1.0,
-        chip_price_multiplier: 1.5,
-        engineers: 10,
-        fabs: 0,
-    };
-
-    enable_raw_mode().unwrap();
-    display_status(&data);
+    // Track time for our automated background loop (1 tick per 500ms)
+    let mut last_fab_tick = Instant::now();
+    let mut last_sell_tick = Instant::now();
 
     loop {
-        if event::poll(Duration::from_millis(100)).unwrap() {
-            // Read the hardware event safely
+        graphics::render_console(&mut terminal, &data);
+
+        // 1. Check for User Input (Quick non-blocking 20ms check)
+        if event::poll(Duration::from_millis(20)).unwrap() {
             if let Event::Key(key_event) = event::read().unwrap() {
-                
-                // Crossterm captures both down-presses and releases (mostly on Windows).
-                // Filter this so our Action logic only fires once per tap.
                 if key_event.kind == KeyEventKind::Press {
                     let action = key_to_action(key_event.code);
                     
-                    // Run the loop and break if 'q' was handled
-                    if game_loop(&action, &mut data) {
-                        break;
+                    if let Action::QuitGame = action {
+                        break; 
                     }
+                    
+                    // Take the action and mark that the state updated
+                    take_action(&action, &mut data);
                 }
+            }
+        }
+        
+        // sell clock
+        if last_sell_tick.elapsed() >= Duration::from_millis(data.ticks.sell_tick as u64) {
+            last_sell_tick = Instant::now(); // Reset the timer clock
+            if data.tech.chips >= 1 {
+                data.tech.chips -= 1;
+                data.tech.money += data.stats.chip_performance / data.stats.chip_yield;
+            } else {
+                // graphics::print_coord("Out of stock!", MESSAGES_ROW, 0);
+                // graphics::flush();
+            }
+        }
+
+        // manufacturing clock
+        if last_fab_tick.elapsed() >= Duration::from_millis(data.ticks.fab_tick as u64) {
+            last_fab_tick = Instant::now(); // Reset the timer clock
+            if data.tech.fabs >= 1 && data.tech.silicon >= data.tech.fabs as u64 {
+                data.tech.chips += data.tech.fabs as u64 * (data.stats.wafer_die_count as f32 * data.stats.chip_yield).floor() as u64;
+                data.tech.silicon -= data.tech.fabs as u64;
+            } else {
+                // graphics::print_coord("Fab ran out of silicon!", MESSAGES_ROW, 0);
+                // graphics::flush();
             }
         }
     }
 
     disable_raw_mode().unwrap();
-    graphics::clear_screen();
+    stdout().execute(EnterAlternateScreen)?; // Switches to a clean full-screen canvas
     println!("Thanks for playing!");
+
+    Ok(())
 }
